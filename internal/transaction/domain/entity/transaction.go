@@ -138,3 +138,38 @@ func (t *Transaction) DomainEvents() []event.DomainEvent {
 func (t *Transaction) ClearDomainEvents() {
 	t.events = nil
 }
+
+
+func (t *Transaction) ID() valueobject.TransactionID {
+	return t.id
+}
+
+func (t *Transaction) Amount() valueobject.Amount {
+	return t.amount
+}
+
+func (t *Transaction) State() state.State {
+	return t.state
+}
+
+func (t *Transaction) CreatedAt() time.Time {
+	return t.createdAt
+}
+
+func (t *Transaction) UpdatedAt() time.Time {
+	return t.updatedAt
+}
+
+func (t *Transaction) Clone() *Transaction {
+	eventsCopy := make([]event.DomainEvent, len(t.events))
+	copy(eventsCopy, t.events)
+
+	return &Transaction{
+		id:        t.id,
+		amount:    t.amount,
+		state:     t.state,
+		createdAt: t.createdAt,
+		updatedAt: t.updatedAt,
+		events:    eventsCopy,
+	}
+}
