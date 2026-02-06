@@ -1,6 +1,7 @@
 package messaging
 
 import (
+	"context"
 	"time"
 
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/domain/event"
@@ -9,14 +10,14 @@ import (
 type EventPublisher struct {
 	queue    chan RetryEvent
 	handlers map[string][]func(event.DomainEvent) error
-	dlq *DeadLetterQueue
+	dlq      *DeadLetterQueue
 }
 
 func NewEventPublisher(workCount int, queueSize int, dlq *DeadLetterQueue) *EventPublisher {
 	p := &EventPublisher{
 		queue:    make(chan RetryEvent, queueSize),
 		handlers: make(map[string][]func(event.DomainEvent) error),
-		dlq: dlq,
+		dlq:      dlq,
 	}
 
 	// start workers
@@ -36,15 +37,23 @@ func (p *EventPublisher) Register(
 
 }
 
-func (p *EventPublisher) Publish(events ...event.DomainEvent) {
+func (p *EventPublisher) Publish(
+	ctx context.Context,
+	events []event.DomainEvent,
+) error {
 	for _, e := range events {
-		p.queue <- RetryEvent{
+		select {
+		case p.queue <- RetryEvent{
 			Event:       e,
 			Attempts:    0,
 			MaxAttempts: 3,
 			NextRetry:   time.Now(),
+		}:
+		case <-ctx.Done():
+			return ctx.Err()
 		}
 	}
+	return nil
 }
 
 func (p *EventPublisher) worker(id int) {
@@ -72,9 +81,9 @@ func (p *EventPublisher) handleRetry(re RetryEvent, err error) {
 	if re.Attempts >= re.MaxAttempts {
 		// dead letter queue
 		p.dlq.Add(DeadLetterEvent{
-			Event:  re.Event,
-			Reason: err.Error(),
-			FailedAt: time.Now(),
+			Event:      re.Event,
+			Reason:     err.Error(),
+			FailedAt:   time.Now(),
 			RetryCount: re.Attempts,
 		})
 		return
