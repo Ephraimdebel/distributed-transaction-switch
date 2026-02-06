@@ -125,11 +125,11 @@ func (t *Transaction) Expire() {
 
 // events
 
-func (t *Transaction) pullEvents() []event.DomainEvent {
-	events := t.events
-	t.events = nil
-	return events
-}
+// func (t *Transaction) pullEvents() []event.DomainEvent {
+// 	events := t.events
+// 	t.events = nil
+// 	return events
+// }
 
 func (t *Transaction) DomainEvents() []event.DomainEvent {
 	return t.events
