@@ -9,12 +9,14 @@ import (
 type EventPublisher struct {
 	queue    chan RetryEvent
 	handlers map[string][]func(event.DomainEvent) error
+	dlq *DeadLetterQueue
 }
 
-func NewEventPublisher(workCount int, queueSize int) *EventPublisher {
+func NewEventPublisher(workCount int, queueSize int, dlq *DeadLetterQueue) *EventPublisher {
 	p := &EventPublisher{
 		queue:    make(chan RetryEvent, queueSize),
 		handlers: make(map[string][]func(event.DomainEvent) error),
+		dlq: dlq,
 	}
 
 	// start workers
@@ -40,7 +42,7 @@ func (p *EventPublisher) Publish(events ...event.DomainEvent) {
 			Event:       e,
 			Attempts:    0,
 			MaxAttempts: 3,
-		    NextRetry: time.Now(),
+			NextRetry:   time.Now(),
 		}
 	}
 }
@@ -56,7 +58,7 @@ func (p *EventPublisher) worker(id int) {
 			err := handler(retryEvent.Event)
 
 			if err != nil {
-				p.handleRetry(retryEvent)
+				p.handleRetry(retryEvent, err)
 				break
 			}
 		}
@@ -64,11 +66,17 @@ func (p *EventPublisher) worker(id int) {
 
 }
 
-func (p *EventPublisher) handleRetry(re RetryEvent) {
+func (p *EventPublisher) handleRetry(re RetryEvent, err error) {
 	re.Attempts++
 
 	if re.Attempts >= re.MaxAttempts {
-		// later -> dead letter queue
+		// dead letter queue
+		p.dlq.Add(DeadLetterEvent{
+			Event:  re.Event,
+			Reason: err.Error(),
+			FailedAt: time.Now(),
+			RetryCount: re.Attempts,
+		})
 		return
 	}
 	re.NextRetry = time.Now().Add(time.Duration(re.Attempts) * time.Second)
