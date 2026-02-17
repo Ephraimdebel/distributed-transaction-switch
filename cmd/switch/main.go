@@ -6,10 +6,16 @@ import (
 	"time"
 
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/application/command"
-	"github.com/Ephraimdebel/transaction-switch/internal/transaction/domain/event"
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/application/service"
+	"github.com/Ephraimdebel/transaction-switch/internal/transaction/domain/event"
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/infrastructure/messaging"
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/infrastructure/persistence"
+
+	"net"
+
+	txgrpc "github.com/Ephraimdebel/transaction-switch/internal/transaction/api/grpc"
+	transactionpb "github.com/Ephraimdebel/transaction-switch/internal/transaction/api/proto"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -62,6 +68,26 @@ func main() {
 			e.Reason,
 			e.RetryCount,
 		)
+	}
+
+	lis, err := net.Listen("tcp", ":50051")
+	if err != nil {
+		panic(err)
+	}
+
+	grpcServer := grpc.NewServer()
+
+	txGRPCServer := txgrpc.NewTransactionGRPCServer(txService)
+
+	transactionpb.RegisterTransactionServiceServer(
+		grpcServer,
+		txGRPCServer,
+	)
+
+	fmt.Println("gRPC server running on :50051")
+
+	if err := grpcServer.Serve(lis); err != nil {
+		panic(err)
 	}
 
 }

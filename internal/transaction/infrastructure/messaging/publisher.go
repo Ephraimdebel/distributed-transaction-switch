@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/Ephraimdebel/transaction-switch/internal/transaction/domain/event"
@@ -72,6 +73,7 @@ func (p *EventPublisher) worker(id int) {
 			}
 		}
 	}
+	fmt.Print("worker ", id)
 
 }
 
